@@ -21,6 +21,7 @@
             status-im.chat.events.commands
             status-im.chat.events.requests
             status-im.chat.events.animation
+            status-im.chat.events.send-message
             status-im.chat.events.receive-message
             status-im.chat.events.sign-up
             status-im.chat.events.console

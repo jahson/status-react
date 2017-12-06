@@ -6,6 +6,8 @@
             [status-im.chat.utils :as chat-utils]
             [status-im.chat.models :as model]
             [status-im.chat.models.input :as input-model]
+            [status-im.chat.models.commands :as commands-model]
+            [status-im.chat.models.message :as message-model]
             [status-im.chat.events.commands :as commands-events]
             [status-im.chat.events.animation :as animation-events]
             [status-im.bots.events :as bots-events]
@@ -148,7 +150,7 @@
                      :path    path
                      :params  params
                      :callback-events-creator (fn [jail-response]
-                                                [[:received-bot-response
+                                                [[:chat-received-message/bot-response
                                                   {:chat-id         current-chat-id
                                                    :command         command
                                                    :parameter-index parameter-index}
@@ -403,20 +405,21 @@
 
 (handlers/register-handler-fx
   ::send-command
-  [re-frame/trim-v]
-  (fn [{{:keys [current-public-key current-chat-id]
-         :accounts/keys [current-account-id] :as db} :db} [{:keys [command] :as command-message}]]
-    {:db (-> db
-             clear-seq-arguments
-             (set-chat-input-metadata nil)
-             (set-chat-input-text nil)
-             (model/set-chat-ui-props {:sending-in-progress? false}))
-     ;; TODO: refactor send-message.cljs to use atomic pure handlers and get rid of this dispatch
-     :dispatch [:check-commands-handlers! {:message (get-in db [:chats current-chat-id :input-text])
-                                           :command  command-message
-                                           :chat-id  current-chat-id
-                                           :identity current-public-key
-                                           :address  current-account-id}]}))
+  message-model/send-interceptors
+  (fn [cofx [{:keys [command] :as command-message}]]
+    (let [{{:keys [current-public-key current-chat-id]
+            :accounts/keys [current-account-id] :as db} :db} cofx
+          cofx' (message-model/process-command cofx
+                                               {:message (get-in db [:chats current-chat-id :input-text])
+                                                :command command-message
+                                                :chat-id current-chat-id
+                                                :identity current-public-key
+                                                :address current-account-id})]
+      (assoc cofx' :db (-> (:db cofx')
+                           (clear-seq-arguments)
+                           (set-chat-input-metadata nil)
+                           (set-chat-input-text nil)
+                           (model/set-chat-ui-props {:sending-in-progress? false}))))))
 
 (handlers/register-handler-fx
   ::check-command-type
@@ -440,8 +443,8 @@
 
 (handlers/register-handler-fx
   :send-current-message
-  [(re-frame/inject-cofx :random-id)]
-  (fn [{{:keys [current-chat-id current-public-key] :as db} :db message-id :random-id current-time :now} _]
+  message-model/send-interceptors
+  (fn [{{:keys [current-chat-id current-public-key] :as db} :db message-id :random-id current-time :now :as cofx} _]
     (let [input-text   (get-in db [:chats current-chat-id :input-text])
           chat-command (-> (input-model/selected-chat-command db)
                            (as-> selected-command
@@ -464,14 +467,32 @@
         ;; no command detected, when not empty, proceed by sending text message without command processing
         (if (str/blank? input-text)
           {:db db}
-          {:db (-> db
-                   (set-chat-input-metadata nil)
-                   (set-chat-input-text nil))
-           ;; TODO: refactor send-message.cljs to use atomic pure handlers and get rid of this dispatch
-           :dispatch [:prepare-message {:message  input-text
-                                        :chat-id  current-chat-id
-                                        :identity current-public-key
-                                        :address  (:accounts/current-account-id db)}]})))))
+          (let [cofx' (message-model/send-message cofx
+                                                  {:message  input-text
+                                                   :chat-id  current-chat-id
+                                                   :identity current-public-key
+                                                   :address  (:accounts/current-account-id db)})]
+            (assoc cofx' :db (-> (:db cofx')
+                                 (set-chat-input-metadata nil)
+                                 (set-chat-input-text nil)))))))))
+
+(handlers/register-handler-fx
+  ::send-command
+  message-model/send-interceptors
+  (fn [cofx [{:keys [command] :as command-message}]]
+    (let [{{:keys [current-public-key current-chat-id]
+            :accounts/keys [current-account-id] :as db} :db} cofx
+          cofx' (message-model/process-command cofx
+                                               {:message (get-in db [:chats current-chat-id :input-text])
+                                                :command command-message
+                                                :chat-id current-chat-id
+                                                :identity current-public-key
+                                                :address current-account-id})]
+      (assoc cofx' :db (-> (:db cofx')
+                           (clear-seq-arguments)
+                           (set-chat-input-metadata nil)
+                           (set-chat-input-text nil)
+                           (model/set-chat-ui-props {:sending-in-progress? false}))))))
 
 ;; TODO: remove this handler and leave only helper fn once all invocations are refactored
 (handlers/register-handler-db
