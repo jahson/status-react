@@ -55,7 +55,7 @@
    {:keys [from group-id chat-id content-type content message-id timestamp clock-value]
     :as   message
     :or   {clock-value 0}}]
-  (let [{:keys [access-scope->commands-responses] :contacts/keys [contacts]} db 
+  (let [{:keys [access-scope->commands-responses] :contacts/keys [contacts]} db
         {:keys [public-key] :as current-account} (get-current-account db)
         chat-identifier (or group-id chat-id from)]
     ;; proceed with adding message if message is not already stored in realm,
@@ -63,7 +63,7 @@
     ;; (either current active chat or new chat not existing yet)
     (when (and (not (message-exists? message-id))
                (not= from public-key)
-               (pop-up-chat? chat-identifier)) 
+               (pop-up-chat? chat-identifier))
       (let [fx               (if (get-in db [:chats chat-identifier])
                                (model/upsert-chat cofx {:chat-id    chat-identifier
                                                         :group-chat (boolean group-id)})
@@ -109,15 +109,21 @@
   (fn [{:keys [db] :as cofx} [{:keys [content] :as message}]]
     (if (:command content)
       ;; we are dealing with received command message, we can't add it right away,
-      ;; we first need to fetch preview and add it only after we already have the preview.
+      ;; we first need to fetch short-preview + preview and add it only after we already have those.
       ;; note that `request-command-message-data` implicitly wait till jail is ready and
-      ;; call is made only after that
+      ;; calls are made only after that
       (commands-events/request-command-message-data
        db message
-       {:data-type             :preview
-        :proceed-event-creator (fn [preview]
-                                 [::received-message
-                                  (assoc-in message [:content :preview] preview)])})
+       {:data-type             :short-preview
+        :proceed-event-creator (fn [short-preview]
+                                 [:request-command-message-data
+                                  message
+                                  {:data-type             :preview
+                                   :proceed-event-creator (fn [preview]
+                                                            [::received-message
+                                                             (update message :content merge
+                                                                     {:short-preview short-preview
+                                                                      :preview       preview})])}])})
       ;; regular non command message, we can add it right away
       (add-message cofx message))))
 
