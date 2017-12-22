@@ -32,7 +32,7 @@
          [react/view styles/wnode-item-inner
           [react/text {:style styles/wnode-item-name-text}
            name]
-          (when connected?
+          #_(when connected?
             [react/text {:style styles/wnode-item-connected-text}
              (i18n/label :t/connected)])]]]))))
 
@@ -52,7 +52,8 @@
      [toolbar/simple-toolbar (i18n/label :t/offline-messaging-settings)]
      (when platform/ios?
        [common/separator])
-     [react/view
+     [react/view {:flex 1}
       [render-header wnodes]
       [list/flat-list {:data wnodes
-                       :render-fn (render-row current-wnode)}]]]))
+                       :render-fn (render-row current-wnode)
+                       :style styles/wnodes-list}]]]))

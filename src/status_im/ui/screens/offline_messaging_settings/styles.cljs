@@ -3,7 +3,7 @@
   (:require-macros [status-im.utils.styles :refer [defstyle]]))
 
 (def wnodes-list
-  {:background-color common/color-white})
+  {:background-color common/color-light-gray})
 
 (def wnode-item-inner
   {:padding-horizontal 16})
