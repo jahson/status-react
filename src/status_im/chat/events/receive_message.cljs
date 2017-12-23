@@ -7,8 +7,7 @@
             [status-im.constants :as const]
             [status-im.chat.utils :as chat-utils]
             [status-im.chat.models :as model]
-            [status-im.chat.models.commands :as commands-model]
-            [status-im.chat.models.unviewed-messages :as unviewed-messages-model]
+            [status-im.chat.models.commands :as commands-model] 
             [status-im.chat.events.commands :as commands-events]
             [status-im.chat.events.requests :as requests-events]
             [status-im.data-store.chats :as chat-store]
@@ -47,15 +46,15 @@
 (defn- add-message-to-db
   [db {:keys [message-id] :as message} chat-id]
   (-> db
-      (chat-utils/add-message-to-db chat-id chat-id message (:new? message))
-      (unviewed-messages-model/add-unviewed-message chat-id message-id)))
+      (update-in [:chats chat-id :unviewed-messages] (fnil conj #{}) message-id)
+      (chat-utils/add-message-to-db chat-id chat-id message (:new? message))))
 
 (defn add-message
   [{:keys [db message-exists? pop-up-chat? get-last-clock-value now] :as cofx}
    {:keys [from group-id chat-id content-type content message-id timestamp clock-value]
     :as   message
     :or   {clock-value 0}}]
-  (let [{:keys [access-scope->commands-responses] :contacts/keys [contacts]} db 
+  (let [{:keys [access-scope->commands-responses] :contacts/keys [contacts]} db
         {:keys [public-key] :as current-account} (get-current-account db)
         chat-identifier (or group-id chat-id from)]
     ;; proceed with adding message if message is not already stored in realm,
@@ -63,7 +62,7 @@
     ;; (either current active chat or new chat not existing yet)
     (when (and (not (message-exists? message-id))
                (not= from public-key)
-               (pop-up-chat? chat-identifier)) 
+               (pop-up-chat? chat-identifier))
       (let [fx               (if (get-in db [:chats chat-identifier])
                                (model/upsert-chat cofx {:chat-id    chat-identifier
                                                         :group-chat (boolean group-id)})
@@ -77,6 +76,8 @@
                                             :clock-value (clocks/receive
                                                           clock-value
                                                           (get-last-clock-value chat-identifier)))
+                               public-key
+                               (assoc :user-statuses {public-key :received})
                                (and command command-request?)
                                (assoc-in [:content :content-command-ref]
                                          (lookup-response-ref access-scope->commands-responses
