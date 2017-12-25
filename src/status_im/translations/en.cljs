@@ -370,7 +370,7 @@
    :rpc-url                               "RPC URL"
    :remove-network                        "Remove network"
    :network-settings                      "Network settings"
-   :offline-messaging-settings            "Offline message settings"
+   :offline-messaging-settings            "Offline messages settings"
    :edit-network-warning                  "Be careful, editing the network data may disable this network for you"
    :connecting-requires-login             "Connecting to another network requires login"
    :close-app-title                       "Warning!"

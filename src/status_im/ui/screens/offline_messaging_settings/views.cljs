@@ -36,10 +36,13 @@
             [react/text {:style styles/wnode-item-connected-text}
              (i18n/label :t/connected)])]]]))))
 
+(defn- form-title [label]
+  (update-in (common/form-title label) [1 2 1] dissoc :margin-top))
+
 (defn- render-header [wnodes]
   [react/list-item
    [react/view
-    [common/form-title (i18n/label :t/existing-wnodes)
+    [form-title (i18n/label :t/existing-wnodes)
      {:count-value (count wnodes)}]
     [common/list-header]]])
 
